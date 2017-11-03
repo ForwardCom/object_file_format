@@ -1,21 +1,24 @@
 /****************************    elf_forwardcom.h    **************************
-* Author:        Agner Fog
-* Date created:  2016-06-25
-* Last modified: 2016-06-25
-* Version:       1.02 (preliminary)
+* Author:              Agner Fog
+* Date created:        2016-06-25
+* Last modified:       2017-11-03
+* ForwardCom version:  1.07
+* Program version:     1.00
 * Project:       ForwardCom development tools
 * Description:
-* Header file for definition of structures in 64 bit ELF object file format for the
-* experimental ForwardCom instruction set architecture.
+* Header file for definition of structures in 64 bit ELF object file format 
+* for the ForwardCom instruction set architecture.
 *
-* To do: define formats for debug information
 * To do: define exception handler and stack unwind information
+* To do: define constructor and destructor information
+* To do: define formats for debug information
 * To do: define access rights of executable file or device driver
 *
-* Copyright 2016 GNU General Public License http://www.gnu.org/licenses/gpl.html
+* Copyright 2016-2017 GNU General Public License v. 3
+* http://www.gnu.org/licenses/gpl.html
 ******************************************************************************/
 #ifndef ELF_FORW_H
-#define ELF_FORW_H
+#define ELF_FORW_H  107
 
 /********************** FILE HEADER **********************/
 
@@ -33,7 +36,7 @@ struct Elf64_Ehdr {
   uint64_t  e_entry;       // Entry point virtual address
   uint64_t  e_phoff;       // Program header table file offset
   uint64_t  e_shoff;       // Section header table file offset
-  uint32_t  e_flags;       // Processor-specific flags. We may define any values for these flags!
+  uint32_t  e_flags;       // Processor-specific flags. We may define any values for these flags
   uint16_t  e_ehsize;      // ELF header size in bytes
   uint16_t  e_phentsize;   // Program header table entry size
   uint16_t  e_phnum;       // Program header table entry count
@@ -47,7 +50,8 @@ struct Elf64_Ehdr {
 // The macros under each EI_* macro are the values the byte may have. 
 
 // Conglomeration of the identification bytes, for easy testing as a word.
-#define ELFMAG        "\177ELF"
+//#define ELFMAG        "\177ELF"
+#define ELFMAG        0x464C457F  // 0x7F 'E' 'L' 'F'
 
 // File class
 #define EI_CLASS      4    // File class byte index
@@ -71,7 +75,8 @@ struct Elf64_Ehdr {
 #define ELFOSABI_STANDALONE  255  // Standalone (embedded) application
 #define ELFOSABI_FORWARDCOM  250  // ForwardCom 
 
-#define EI_ABIVERSION    8    // ABI version
+#define EI_ABIVERSION    8    // x86 ABI version
+#define EI_ABIVERSION_FORWARDCOM    1    // ForwardCom ABI version
 
 #define EI_PAD           9    // Byte index of padding bytes
 
@@ -79,7 +84,7 @@ struct Elf64_Ehdr {
 #define ET_NONE          0    // No file type
 #define ET_REL           1    // Relocatable file
 #define ET_EXEC          2    // Executable file
-#define ET_DYN           3    // Shared object file (not used)
+#define ET_DYN           3    // Shared object file (not used by ForwardCom)
 #define ET_CORE          4    // Core file 
 #define ET_NUM           5    // Number of defined types
 #define ET_LOOS     0xfe00    // OS-specific range start
@@ -175,7 +180,7 @@ struct Elf64_Shdr {
   uint32_t  sh_name;      // Section name (string table index)
   uint32_t  sh_type;      // Section type
   uint64_t  sh_flags;     // Section flags
-  uint64_t  sh_addr;      // Section virtual addr at execution
+  uint64_t  sh_addr;      // Section virtual addr at execution. ForwardCom: Address relative to section group begin
   uint64_t  sh_offset;    // Section file offset
   uint64_t  sh_size;      // Section size in bytes
   uint32_t  sh_link;      // Link to another section
@@ -184,18 +189,19 @@ struct Elf64_Shdr {
   uint64_t  sh_entsize;   // Entry size if section holds table
 };
 
+// Special section indices. not used
 
-// Special section indices
 #define SHN_UNDEF                     0  // Undefined section
-#define SHN_LORESERVE  ((int16_t)0xff00) // Start of reserved indices
-#define SHN_LOPROC     ((int16_t)0xff00) // Start of processor-specific
-#define SHN_HIPROC     ((int16_t)0xff1f) // End of processor-specific
-#define SHN_LOOS       ((int16_t)0xff20) // Start of OS-specific
-#define SHN_HIOS       ((int16_t)0xff3f) // End of OS-specific
-#define SHN_ABS        ((int16_t)0xfff1) // Associated symbol is absolute
-#define SHN_COMMON     ((int16_t)0xfff2) // Associated symbol is common
-#define SHN_XINDEX     ((int16_t)0xffff) // Index is in extra table
-#define SHN_HIRESERVE  ((int16_t)0xffff) // End of reserved indices
+//#define SHN_LORESERVE  ((int16_t)0xff00) // Start of reserved indices
+//#define SHN_LOPROC     ((int16_t)0xff00) // Start of processor-specific
+//#define SHN_HIPROC     ((int16_t)0xff1f) // End of processor-specific
+//#define SHN_LOOS       ((int16_t)0xff20) // Start of OS-specific
+//#define SHN_HIOS       ((int16_t)0xff3f) // End of OS-specific
+#define SHN_ABS_X86      ((int16_t)0xfff1) // Associated symbol is absolute (x86 ELF)
+#define SHN_ABS          0xFFFFFFF1        // Associated symbol is absolute and defined (ForwardCom)
+#define SHN_COMMON       ((int16_t)0xfff2) // Associated symbol is common (x86 ELF)
+//#define SHN_XINDEX     ((int16_t)0xffff) // Index is in extra table
+//#define SHN_HIRESERVE  ((int16_t)0xffff) // End of reserved indices
 
 // Legal values for sh_type (section type).
 #define SHT_NULL                    0  // Section header table entry unused
@@ -206,10 +212,11 @@ struct Elf64_Shdr {
 #define SHT_HASH                    5  // Symbol hash table
 #define SHT_DYNAMIC                 6  // Dynamic linking information
 #define SHT_NOTE                    7  // Notes
-#define SHT_NOBITS                  8  // Program space with no data (bss)
+#define SHT_NOBITS                  8  // Uninitialized data space (bss)
 #define SHT_REL                     9  // Relocation entries, no addends
 #define SHT_SHLIB                  10  // Reserved
 #define SHT_DYNSYM                 11  // Dynamic linker symbol table
+#define SHT_COMDAT                 12  // Communal data or code. Duplicate and unreferenced sections are removed
 #define SHT_INIT_ARRAY             14  // Array of constructors
 #define SHT_FINI_ARRAY             15  // Array of destructors
 #define SHT_PREINIT_ARRAY          16  // Array of pre-constructors
@@ -217,217 +224,208 @@ struct Elf64_Shdr {
 #define SHT_SYMTAB_SHNDX           18  // Extended section indeces
 #define SHT_NUM                    19  // Number of defined types. 
 #define SHT_LOOS           0x60000000  // Start OS-specific
-#define SHT_STACKSIZE      0x60000001  // Records for calculation of stack size
-#define SHT_ACCESSRIGHTS   0x60000002  // Records for indicating desired access rights of executable file or device driver
 #define SHT_HIOS           0x6fffffff  // End OS-specific type
 #define SHT_LOPROC         0x70000000  // Start of processor-specific
+#define SHT_STACKSIZE      0x70000001  // Records for calculation of stack size
+#define SHT_ACCESSRIGHTS   0x70000002  // Records for indicating desired access rights of executable file or device driver
 #define SHT_HIPROC         0x7fffffff  // End of processor-specific
 #define SHT_LOUSER         0x80000000  // Start of application-specific
 #define SHT_HIUSER         0x8fffffff  // End of application-specific
 
-
 // Legal values for sh_flags (section flags). 
-#define SHF_WRITE            (1 << 0)  // Writable
-#define SHF_ALLOC            (1 << 1)  // Occupies memory during execution
-#define SHF_EXECINSTR        (1 << 2)  // Executable
-#define SHF_READ             (1 << 3)  // Readable (added for ForwardCom)
-#define SHF_MERGE            (1 << 4)  // Might be merged
-#define SHF_STRINGS          (1 << 5)  // Contains nul-terminated strings
-#define SHF_INFO_LINK        (1 << 6)  // `sh_info' contains SHT index
-#define SHF_LINK_ORDER       (1 << 7)  // Preserve order after combining
-#define SHF_OS_NONCONFORMING (1 << 8)  // Non-standard OS specific handling required
-#define SHF_MASKOS         0x0ff00000  // OS-specific. 
-#define SHF_MASKPROC       0xf0000000  // Processor-specific
+#define SHF_MERGE                0x10  // Elements with same value might be merged
+#define SHF_STRINGS              0x20  // Contains nul-terminated strings
+#define SHF_INFO_LINK            0x40  // sh_info contains section header index
+#define SHF_ALLOC               0x100  // Occupies memory during execution
+#define SHF_EXEC                0x200  // Executable
+#define SHF_READ                0x400  // Readable
+#define SHF_WRITE               0x800  // Writable
+#define SHF_IP                 0x1000  // Addressed relative to IP (executable and read-only sections)
+#define SHF_DATAP              0x2000  // Addressed relative to DATAP (writeable data sections)
+#define SHF_THREADP            0x4000  // Addressed relative to THREADP (thread-local data sections)
 
 // Section group handling.
-#define GRP_COMDAT  0x1    // Mark group as COMDAT.
+//#define GRP_COMDAT  0x1    // Mark group as COMDAT.
 
-// Symbol table entry.
-/*
-struct Elf32_Sym {
-  uint32_t  st_name;       // Symbol name (string tbl index)
-  uint32_t  st_value;      // Symbol value
-  uint32_t  st_size;       // Symbol size
-  uint8_t   st_type: 4,    // Symbol type
-            st_bind: 4;    // Symbol binding
-  uint8_t   st_other;      // Symbol visibility
-  uint16_t  st_shndx;      // Section index
-};*/
+// Symbol table entry, x64
+struct Elf64_Sym {
+    uint32_t  st_name;       // Symbol name (string tbl index)
+    uint8_t   st_type: 4,    // Symbol type
+              st_bind: 4;    // Symbol binding
+    uint8_t   st_other;      // Symbol visibility
+    uint16_t  st_shndx;      // Section index
+    uint64_t  st_value;      // Symbol value
+    uint64_t  st_size;       // Symbol size
+};
 
-struct Elf64_Symb {
+// Symbol table entry, ForwardCom
+struct ElfFWC_Sym {
   uint32_t  st_name;       // Symbol name (string table index)
   uint16_t  st_type;       // Symbol type
   uint16_t  st_bind;       // Symbol binding
-  uint32_t  st_other;      // Symbol visibility
+  uint32_t  st_other;      // Symbol visibility and additional type information
   uint32_t  st_shndx;      // Section index
   uint64_t  st_value;      // Symbol value
-  uint64_t  st_size;       // Symbol size
-  uint64_t  st_reg_use;    // Register use. bit 0-31 = r0-r31, bit 32-63 = v0-v31
-//uint64_t  st_reg_use2;   // Reserved for future use
+  uint32_t  st_unitsize;   // Size of array elements or data unit. Data type is given by st_unitsize and STV_FLOAT
+                           // st_unitsize is 4 or more for executable code
+  uint32_t  st_unitnum;    // Symbol size = st_unitsize * st_unitnum 
+  uint32_t  st_reguse1;    // Register use. bit 0-31 = r0-r31
+  uint32_t  st_reguse2;    // Register use. bit 0-31 = v0-v31
 };
-
-/* Special section index.  */
-
-#define SHN_UNDEF  0    /* No section, undefined symbol.  */
 
 
 // Values for st_bind: symbol binding
-#define STB_LOCAL    0    // Local symbol
-#define STB_GLOBAL   1    // Global symbol
-#define STB_WEAK     2    // Weak symbol
-#define STB_NUM      3    // Number of defined types. 
-#define STB_LOOS    10    // Start of OS-specific
-#define STB_HIOS    12    // End of OS-specific
-#define STB_LOPROC  13    // Start of processor-specific
-#define STB_HIPROC  15    // End of processor-specific
+#define STB_LOCAL           0     // Local symbol
+#define STB_GLOBAL          1     // Global symbol
+#define STB_WEAK            2     // Weak symbol
+#define STB_NUM             3     // Number of defined types. 
+#define STB_LOOS           10     // Start of OS-specific
+#define STB_HIOS           12     // End of OS-specific
+#define STB_LOPROC         13     // Start of processor-specific
 
 // Values for st_type: symbol type
-#define STT_NOTYPE   0    // Symbol type is unspecified
-#define STT_OBJECT   1    // Symbol is a data object
-#define STT_FUNC     2    // Symbol is a code object
-#define STT_SECTION  3    // Symbol associated with a section
-#define STT_FILE     4    // Symbol's name is file name
-#define STT_COMMON   5    // Symbol is a common data object
-#define STT_NUM      6    // Number of defined types. 
-#define STT_LOOS    10    // Start of OS-specific
-#define STT_FORWC_DISPATCH 10  // Symbol is a dispatcher function for load-time function dispatching
-#define STT_HIOS    12    // End of OS-specific
-#define STT_LOPROC  13    // Start of processor-specific
-#define STT_HIPROC  15    // End of processor-specific
+#define STT_NOTYPE          0     // Symbol type is unspecified
+#define STT_OBJECT          1     // Symbol is a data object
+#define STT_FUNC            2     // Symbol is a code object
+#define STT_SECTION         3     // Symbol is a section begin
+#define STT_FILE            4     // Symbol's name is file name
+#define STT_COMMON          5     // Symbol is a common data object. Use STV_COMMON instead!
+//#define STT_TLS           6     // Thread local data object. Use STV_THREADP instead!
+#define STT_CONSTANT     0x10     // Symbol is a constant with no address
+#define STT_VARIABLE     0x11     // Symbol is a variable used during assembly. Should not occur in object file
+#define STT_EXPRESSION   0x12     // Symbol is an expression used during assembly. Should not occur in object file
 
 // Symbol visibility specification encoded in the st_other field. 
-#define STV_DEFAULT    0       // Default symbol visibility rules
-#define STV_INTERNAL   1       // Processor specific hidden class
-#define STV_HIDDEN     2       // Symbol unavailable in other modules
-#define STV_PROTECTED  3       // Not preemptible, not exported
+#define STV_DEFAULT         0     // Default symbol visibility rules
+//#define STV_INTERNAL        1     // Processor specific hidden class
+#define STV_HIDDEN         0x20     // Symbol unavailable in other modules
+//#define STV_PROTECTED       3     // Not preemptible, not exported
 // st_other types added for ForwardCom:
-#define STV_MAIN       0x100   // Main entry point in executable file
-#define STV_EXPORTED   0x200   // Exported from executable file
-#define STV_THREAD     0x400   // Thread function. Requires own stack
+#define STV_EXEC         SHF_EXEC    // = 0x200. Executable code
+#define STV_READ         SHF_READ    // = 0x400. Readable data
+#define STV_WRITE        SHF_WRITE   // = 0x800. Writable data
+#define STV_IP           SHF_IP      // = 0x1000. Addressed relative to IP (in executable and read-only sections)
+#define STV_DATAP        SHF_DATAP   // = 0x2000. Addressed relative to DATAP (in writeable data sections)
+#define STV_THREADP      SHF_THREADP // = 0x4000. Addressed relative to THREADP (in thrad local data sections)
+#define STV_SECT_ATTR    (SHF_EXEC | SHF_READ | SHF_WRITE | SHF_IP | SHF_DATAP | SHF_THREADP) // section attributes to copy to symbol
+#define STV_REGUSE       0x10000     // st_reguse field contains register use information
+#define STV_FLOAT        0x20000     // st_value is a double precision floating point (with STT_CONSTANT)
+#define STV_STRING       0x40000     // st_value is an assemble-time string. Should not occur in object file
+#define STV_CTOR        0x100000     // Symbol is a constructor to be called before main. st_reguse1 contains priority and options
+#define STV_DTOR        0x200000     // Symbol is a destructor to be called after main. st_reguse1 contains priority and options
+#define STV_UNWIND      0x400000     // Symbol is a table with exception handling and stack unwind information
+#define STV_DEBUG       0x800000     // Symbol is a table with debug information
+#define STV_COMMON     0x1000000     // Symbol is communal. Multiple identical instances can be joined. Unreferenced instances can be removed
+#define STV_RELINK     0x2000000     // Symbol in executable file can be relinked
+#define STV_MAIN      0x10000000     // Main entry point in executable file
+#define STV_EXPORTED  0x20000000     // Exported from executable file
+#define STV_THREAD    0x40000000     // Thread function. Requires own stack
 
-/*
-// Relocation table entry without addend (in section of type SHT_REL. Unused)
-struct Elf64_Rel {
-  uint64_t  r_offset;             // Address
-  uint32_t  r_type;               // Relocation type
-  uint32_t  r_sym;                // Symbol index
-};*/
 
-// Relocation table entry with addend (in section of type SHT_RELA)
+// Relocation table entry with addend, x86-64 in section of type SHT_RELA. Not used in ForwardCom
 struct Elf64_Rela {
-  uint64_t  r_offset;               // Address
-  uint32_t  r_type;                 // Relocation type
-  uint32_t  r_sym;                  // Symbol index
-  int64_t   r_addend;               // Addend
+    uint64_t  r_offset;           // Address
+    uint32_t  r_type;             // Relocation type
+    uint32_t  r_sym;              // Symbol index
+    int64_t   r_addend;           // Addend
 };
+
+// Relocation table entry for ForwardCom (in section of type SHT_RELA)
+struct ElfFWC_Rela {
+    uint64_t  r_offset;           // Address
+    uint32_t  r_type;             // Relocation type
+    uint32_t  r_sym;              // Symbol index
+    int32_t   r_addend;           // Addend
+    uint32_t  r_refsym;           // Reference symbol
+};
+
+// Relocation record with section. Used only internally in the software
+struct ElfFWC_Rela2 : public ElfFWC_Rela {
+    uint32_t  r_section;             // Section
+};
+
+
+// AMD x86-64 relocation types
+#define R_X86_64_NONE       0     // No reloc
+#define R_X86_64_64         1     // Direct 64 bit 
+#define R_X86_64_PC32       2     // Self relative 32 bit signed (not RIP relative in the sense used in COFF files)
+#define R_X86_64_GOT32      3     // 32 bit GOT entry
+#define R_X86_64_PLT32      4     // 32 bit PLT address
+#define R_X86_64_COPY       5     // Copy symbol at runtime
+#define R_X86_64_GLOB_DAT   6     // Create GOT entry
+#define R_X86_64_JUMP_SLOT  7     // Create PLT entry
+#define R_X86_64_RELATIVE   8     // Adjust by program base
+#define R_X86_64_GOTPCREL   9     // 32 bit signed self relative offset to GOT
+#define R_X86_64_32        10     // Direct 32 bit zero extended
+#define R_X86_64_32S       11     // Direct 32 bit sign extended
+#define R_X86_64_16        12     // Direct 16 bit zero extended
+#define R_X86_64_PC16      13     // 16 bit sign extended self relative
+#define R_X86_64_8         14     // Direct 8 bit sign extended
+#define R_X86_64_PC8       15     // 8 bit sign extended self relative
+#define R_X86_64_IRELATIVE 37     // Reference to PLT entry of indirect function (STT_GNU_IFUNC)
+
 
 // ForwardCom relocation types are composed of these three fields:
 // Relocation type in bit 16-31
-// Size in bit 8-15
+// Relocation size in bit 8-15
 // Scale factor in bit 0-7.
-// Other combinations than the ones named below may be supported.
-// Divide the relative address by the scale factor - it will be multiplied by the same factor 
-// by the instruction. All relative addresses are signed.
+// The r_type field is composed by OR'ing these three.
+// The value in the relocation field of the specified size will be multiplied by the scale factor.
+// All relative relocations use signed values.
 // Instructions with self-relative (IP-relative) addressing are using the END of the instruction 
-// as reference point. The r_addend field in Elf64_Rela must compensate for the distance between 
+// as reference point. The r_addend field must compensate for the distance between 
 // the end of the instruction and the beginning of the address field. This will be -7 for 
-// instructions with format 2.7.3 and -4 for all other jump and call instructions. Any
-// offset of the target may be added to r_addend.
+// instructions with format 2.5.3 and -4 for all other jump and call instructions. 
+// Any offset of the target may be added to r_addend. The value of r_addend is not scaled.
 // Relocations relative to an arbitrary reference point can be used in jump tables.
-// The reference point is indicated by a symbol index in the high 32 bits of r_addend.
-// Only the low 32 bits of r_addend are used as addend in this case.
+// The reference point is indicated by a symbol index in r_refsym.
 // The system function ID relocations are done by the loader, where r_sym indicates the name
 // of the function in the string table, and r_addend indicates the name of the module or
 // device driver.
-#define R_FORW_NONE             0x000000    // No relocation
-#define R_FORW_ABS_16           0x000200    // Absolute address, 16 bit
-#define R_FORW_ABS_32           0x000400    // Absolute address, 32 bit
-#define R_FORW_ABS_64           0x000600    // Absolute address, 64 bit
-#define R_FORW_ABS_64LO         0x000700    // Absolute address, low  32 of 64 bits
-#define R_FORW_ABS_64HI         0x000800    // Absolute address, high 32 of 64 bits
-#define R_FORW_IP_8             0x010100    // Self-relative, 8 bit
-#define R_FORW_IP_8_S4          0x010102    // Self-relative, 8 bit, scale by 4
-#define R_FORW_IP_16            0x010200    // Self-relative, 16 bit
-#define R_FORW_IP_16_S4         0x010202    // Self-relative, 16 bit, scale by 4
-#define R_FORW_IP_24            0x010300    // Self-relative, 24 bit
-#define R_FORW_IP_24_S4         0x010302    // Self-relative, 24 bit, scale by 4
-#define R_FORW_IP_32            0x010400    // Self-relative, 32 bit
-#define R_FORW_IP_32_S4         0x010402    // Self-relative, 32 bit, scale by 4
-#define R_FORW_CONST_8          0x040100    // Relative to CONST section begin, 8 bit
-#define R_FORW_CONST_16         0x040200    // Relative to CONST section begin, 16 bit
-#define R_FORW_CONST_32         0x040400    // Relative to CONST section begin, 32 bit
-#define R_FORW_BSS_8            0x050100    // Relative to BSS section begin / DATA section end, 8 bit
-#define R_FORW_BSS_16           0x050200    // Relative to BSS section begin / DATA section end, 16 bit
-#define R_FORW_BSS_32           0x050400    // Relative to BSS section begin / DATA section end, 32 bit
-#define R_FORW_REFP_8           0x080100    // Relative to arbitrary reference point, 8 bit. Reference symbol index in high 32 bits of r_addend
-#define R_FORW_REFP_8_S2        0x080101    // Relative to arbitrary reference point, 8 bit, scale by  2.
-#define R_FORW_REFP_8_S4        0x080102    // Relative to arbitrary reference point, 8 bit, scale by  4.
-#define R_FORW_REFP_8_S8        0x080103    // Relative to arbitrary reference point, 8 bit, scale by  8.
-#define R_FORW_REFP_8_S16       0x080104    // Relative to arbitrary reference point, 8 bit, scale by 16.
-#define R_FORW_REFP_16          0x080200    // Relative to arbitrary reference point, 16 bit.
-#define R_FORW_REFP_16_S4       0x080202    // Relative to arbitrary reference point, 16 bit, scale by  4.
-#define R_FORW_REFP_24          0x080300    // Relative to arbitrary reference point, 24 bit.
-#define R_FORW_REFP_24_S4       0x080302    // Relative to arbitrary reference point, 24 bit, scale by  4.
-#define R_FORW_REFP_32          0x080400    // Relative to arbitrary reference point, 32 bit.
-#define R_FORW_REFP_32_S4       0x080402    // Relative to arbitrary reference point, 32 bit, scale by  4.
-#define R_FORW_REFP_64          0x080600    // Relative to arbitrary reference point, 64 bit.
-#define R_FORW_REFP_64_S4       0x080602    // Relative to arbitrary reference point, 64 bit, scale by  4.
-#define R_FORW_REFP_64LO        0x080700    // Relative to arbitrary reference point, low  32 of 64 bits.
-#define R_FORW_REFP_64HI        0x080800    // Relative to arbitrary reference point, high 32 of 64 bits.
-#define R_FORW_SYSFUNC_16       0x100200    // System function ID for system_call, 16 bit
-#define R_FORW_SYSFUNC_32       0x100400    // System function ID for system_call, 32 bit 
-#define R_FORW_SYSMODUL_16      0x110200    // System module ID for system_call, 16 bit
-#define R_FORW_SYSMODUL_32      0x110400    // System module ID for system_call, 32 bit
-#define R_FORW_SYSCALL_32       0x120400    // System module and function ID for system_call, 16+16=32 bit
-#define R_FORW_SYSCALL_64       0x120600    // System module and function ID for system_call, 32+32=64 bit
-#define R_FORW_DATASTACK_32     0x200200    // Calculated size of data stack for function, 32 bit. Resolved at load time
-#define R_FORW_DATASTACK_32_S8  0x200203    // Calculated size of data stack for function, 32 bit, scale by 8. Resolved at load time
-#define R_FORW_DATASTACK_64     0x200400    // Calculated size of data stack for function, 64 bit. Resolved at load time
-#define R_FORW_DATASTACK_64_S8  0x200403    // Calculated size of data stack for function, 64 bit, scale by 8. Resolved at load time
-#define R_FORW_CALLSTACK_32     0x210200    // Calculated size of call stack for function, 32 bit. Resolved at load time
-#define R_FORW_CALLSTACK_32_S8  0x210203    // Calculated size of call stack for function, 32 bit, scale by 8. Resolved at load time
-#define R_FORW_REGUSE_64        0x400600    // Register use of function, 64 bit
-#define R_FORW_REGUSE_64LO      0x400700    // Register use of function, low  32 of 64 bits = general purpose registers
-#define R_FORW_REGUSE_64HI      0x400800    // Register use of function, high 32 of 64 bits = vector registers
+
+// ForwardCom relocation types
+#define R_FORW_ABS           0x000000       // Absolute address. No scale factor allowed
+#define R_FORW_SELFREL       0x010000       // Self relative. Usually scale by 4.
+#define R_FORW_CONST         0x040000       // Relative to CONST section begin. Any scale
+#define R_FORW_DATAP         0x050000       // Relative to data pointer. Any scale
+#define R_FORW_THREADP       0x060000       // Relative to thread data pointer. Any scale
+#define R_FORW_REFP          0x080000       // Relative to arbitrary reference point. Reference symbol index in high 32 bits of r_addend. Any scale
+#define R_FORW_SYSFUNC       0x100000       // System function ID for system_call, 16 or 32 bit
+#define R_FORW_SYSMODUL      0x110000       // System module ID for system_call, 16 or 32 bit
+#define R_FORW_SYSCALL       0x120000       // Combined system module and function ID for system_call, 32 or 64 bit
+#define R_FORW_DATASTACK     0x200000       // Calculated size of data stack for function, 32 or 64 bit. Scale by 1 or 8
+#define R_FORW_CALLSTACK     0x210000       // Calculated size of call stack for function, 32 bit. Scale by 1 or 8
+#define R_FORW_REGUSE        0x400000       // Register use of function, 64 bit
+#define R_FORW_RELTYPEMASK   0xFF0000       // Mask for isolating relocation type
+
+// Relocation sizes
+#define R_FORW_NONE          0x000000       // No relocation
+#define R_FORW_8             0x000100       // 8  bit relocation size
+#define R_FORW_16            0x000200       // 16 bit relocation size
+#define R_FORW_24            0x000300       // 24 bit relocation size
+#define R_FORW_32            0x000400       // 32 bit relocation size
+#define R_FORW_32LO          0x000500       // Low  16 of 32 bits relocation
+#define R_FORW_32HI          0x000600       // High 16 of 32 bits relocation
+#define R_FORW_64            0x000800       // 64 bit relocation size
+#define R_FORW_64LO          0x000900       // Low  32 of 64 bits relocation
+#define R_FORW_64HI          0x000A00       // High 32 of 64 bits relocation
+#define R_FORW_RELSIZEMASK   0x00FF00       // Mask for isolating relocation size
+
+// Relocation scale factors
+#define R_FORW_SCALE1        0x000000       // Scale factor 1
+#define R_FORW_SCALE2        0x000001       // Scale factor 2
+#define R_FORW_SCALE4        0x000002       // Scale factor 4
+#define R_FORW_SCALE8        0x000003       // Scale factor 8
+#define R_FORW_SCALE16       0x000004       // Scale factor 16
+#define R_FORW_RELSCALEMASK  0x0000FF       // Mask for isolating relocation scale factor
+
+// Relocation options
+#define R_FORW_RELINK      0x01000000       // Refers to relinkable symbol in executable file
+
+
+// Program header
 
 /*
-// i386 Relocation types
-#define R_386_NONE      0    // No reloc
-#define R_386_32        1    // Direct 32 bit
-#define R_386_PC32      2    // Self-relative 32 bit (not EIP relative in the sense used in COFF files)
-#define R_386_GOT32     3    // 32 bit GOT entry
-#define R_386_PLT32     4    // 32 bit PLT address
-#define R_386_COPY      5    // Copy symbol at runtime
-#define R_386_GLOB_DAT  6    // Create GOT entry
-#define R_386_JMP_SLOT  7    // Create PLT entry
-#define R_386_RELATIVE  8    // Adjust by program base
-#define R_386_GOTOFF    9    // 32 bit offset to GOT 
-#define R_386_GOTPC    10    // 32 bit self relative offset to GOT
-#define R_386_IRELATIVE 42   // Reference to PLT entry of indirect function (STT_GNU_IFUNC)
-
-// AMD x86-64 relocation types
-#define R_X86_64_NONE       0  // No reloc
-#define R_X86_64_64         1  // Direct 64 bit 
-#define R_X86_64_PC32       2  // Self relative 32 bit signed (not RIP relative in the sense used in COFF files)
-#define R_X86_64_GOT32      3  // 32 bit GOT entry
-#define R_X86_64_PLT32      4  // 32 bit PLT address
-#define R_X86_64_COPY       5  // Copy symbol at runtime
-#define R_X86_64_GLOB_DAT   6  // Create GOT entry
-#define R_X86_64_JUMP_SLOT  7  // Create PLT entry
-#define R_X86_64_RELATIVE   8  // Adjust by program base
-#define R_X86_64_GOTPCREL   9  // 32 bit signed self relative offset to GOT
-#define R_X86_64_32        10  // Direct 32 bit zero extended
-#define R_X86_64_32S       11  // Direct 32 bit sign extended
-#define R_X86_64_16        12  // Direct 16 bit zero extended
-#define R_X86_64_PC16      13  // 16 bit sign extended self relative
-#define R_X86_64_8         14  // Direct 8 bit sign extended
-#define R_X86_64_PC8       15  // 8 bit sign extended self relative
-#define R_X86_64_IRELATIVE 37  // Reference to PLT entry of indirect function (STT_GNU_IFUNC)
-*/
-
-
-// Program segment header.
-
 struct Elf32_Phdr {
   uint32_t  p_type;      // Segment type
   uint32_t  p_offset;    // Segment file offset
@@ -437,7 +435,7 @@ struct Elf32_Phdr {
   uint32_t  p_memsz;     // Segment size in memory
   uint32_t  p_flags;     // Segment flags
   uint32_t  p_align;     // Segment alignment
-};
+};*/
 
 struct Elf64_Phdr {
   uint32_t  p_type;      // Segment type
