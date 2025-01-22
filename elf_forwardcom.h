@@ -1,9 +1,9 @@
 /****************************    elf_forwardcom.h    **************************
 * Author:              Agner Fog
 * Date created:        2016-06-25
-* Last modified:       2024-07-29
-* ForwardCom version:  1.13
-* Program version:     1.13
+* Last modified:       2025-01-21
+* ForwardCom version:  1.14
+* Program version:     1.14
 * Project:             ForwardCom binary tools
 * Description:         Definition of ELF file format. See below
 *
@@ -13,7 +13,7 @@
 * To do: define formats for debug information
 * To do: define access rights for executable file or device driver
 *
-* Copyright 2016-2024 GNU General Public License v. 3
+* Copyright 2016-2025 GNU General Public License v. 3
 * http://www.gnu.org/licenses/gpl.html
 *******************************************************************************
 
@@ -635,10 +635,10 @@ struct ElfFwcStacksize {
                                             // 11: truncate towards zero
                                             // 100: odd if not exact
 #define MSKI_EXCEPTIONS               2     // bit number 2-5 enable exceptions for division by zero, overflow, underflow, inexact
-#define MSK_DIVZERO                   2     // enable NAN exception for floating point division by zero
-#define MSK_OVERFLOW                  3     // enable NAN exception for floating point overflow
-#define MSK_UNDERFLOW                 4     // enable NAN exception for floating point underflow
-#define MSK_INEXACT                   5     // enable NAN exception for floating point inexact
+#define MSK_DIVZERO                   2     // enable NaN exception for floating point division by zero
+#define MSK_OVERFLOW                  3     // enable NaN exception for floating point overflow
+#define MSK_UNDERFLOW                 4     // enable NaN exception for floating point underflow
+#define MSK_INEXACT                   5     // enable NaN exception for floating point inexact
 #define MSK_SUBNORMAL                13     // bit 13-14 enable subnormal numbers for float32 and float64
 #define MSK_CONST_TIME               31     // constant execution time, independent of data (for cryptographic security)
 
@@ -647,9 +647,11 @@ struct ElfFwcStacksize {
 //                            EXCEPTION CODES
 //--------------------------------------------------------------------------
 
-// NAN payloads are used for indicating that floating point exceptions have occurred.
+// NaN payloads are used for indicating that floating point exceptions or other
+// errors have occurred.
 // These values are left-justified in the NaN payload after the 'quiet' bit.
-const uint32_t nan_data_error        = 0b111111111;  // data not available
+const uint32_t nan_data_uninitialized= 0b111111111;  // data not initialized
+const uint32_t nan_data_unavailable  = 0b111111110;  // data not available
 const uint32_t nan_div0              = 0b111110111;  // division by 0 (mask bit 2)
 const uint32_t nan_overflow_div      = 0b111101111;  // division overflow (mask bit 3)
 const uint32_t nan_overflow_mul      = 0b111101110;  // multiplication overflow (mask bit 3)
